@@ -41,9 +41,10 @@ Host::Host(std::string const& _clientVersion, NetworkPreferences const& _n, bool
 	Worker("p2p", 0),
 	m_clientVersion(_clientVersion),
 	m_netPrefs(_n),
-	m_ifAddresses(Network::getInterfaceAddresses()),
-	m_ioService(2),
+	m_ifAddresses(HostNetwork::getInterfaceAddresses()),
+	m_ioService(2), // once network is abstracted, default is faster
 	m_acceptorV4(m_ioService),
+	m_acceptorV6(m_ioService),
 	m_key(KeyPair::create())
 {
 	for (auto address: m_ifAddresses)
@@ -67,15 +68,10 @@ void Host::start()
 
 void Host::stop()
 {
-	// called to force io_service to kill any remaining tasks it might have -
-	// such tasks may involve socket reads from Capabilities that maintain references
-	// to resources we're about to free.
-
 	{
-		// Although m_run is set by stop() or start(), it effects m_runTimer so x_runTimer is used instead of a mutex for m_run.
+		// m_run effects m_runTimer so x_runTimer is used
 		// when m_run == false, run() will cause this::run() to stop() ioservice
 		Guard l(x_runTimer);
-		// ignore if already stopped/stopping
 		if (!m_run)
 			return;
 		m_run = false;
@@ -94,17 +90,19 @@ void Host::doneWorking()
 	// reset ioservice (allows manually polling network, below)
 	m_ioService.reset();
 	
-	// shutdown acceptor
-	m_acceptorV4.cancel();
 	if (m_acceptorV4.is_open())
+	{
+		m_acceptorV4.cancel();
 		m_acceptorV4.close();
+	}
+	if (m_acceptorV6.is_open())
+	{
+		m_acceptorV6.cancel();
+		m_acceptorV6.close();
+	}
 	
-	// There maybe an incoming connection which started but hasn't finished.
-	// Wait for acceptor to end itself instead of assuming it's complete.
-	// This helps ensure a peer isn't stopped at the same time it's starting
-	// and that socket for pending connection is closed.
-	while (m_accepting)
-		m_ioService.poll();
+	// Poll for incoming connection which have been accepted but not started.
+	m_ioService.poll();
 
 	// stop capabilities (eth: stops syncing or block/tx broadcast)
 	for (auto const& h: m_capabilities)
@@ -126,7 +124,7 @@ void Host::doneWorking()
 		if (!n)
 			break;
 		
-		// poll so that peers send out disconnect packets
+		// poll until peers send out disconnect packets and are dropped
 		m_ioService.poll();
 	}
 	
@@ -296,7 +294,7 @@ void Host::determinePublic(string const& _publicAddress, bool _upnp)
 	if (_upnp)
 	{
 		bi::address upnpifaddr;
-		bi::tcp::endpoint upnpep = Network::traverseNAT(m_ifAddresses, m_listenPort, upnpifaddr);
+		bi::tcp::endpoint upnpep = NetworkStatic::traverseNAT(m_ifAddresses, m_listenPort, upnpifaddr);
 		if (!upnpep.address().is_unspecified() && !upnpifaddr.is_unspecified())
 		{
 			if (!m_peerAddresses.count(upnpep.address()))
@@ -320,53 +318,49 @@ void Host::determinePublic(string const& _publicAddress, bool _upnp)
 	m_public = bi::tcp::endpoint(bi::address(), m_listenPort);
 }
 
-void Host::runAcceptor()
+void Host::doAcceptConnection(bi::tcp::acceptor& _acceptor)
 {
 	assert(m_listenPort > 0);
-	
-	if (m_run && !m_accepting)
-	{
-		clog(NetConnect) << "Listening on local port " << m_listenPort << " (public: " << m_public << ")";
-		m_accepting = true;
-		m_socket.reset(new bi::tcp::socket(m_ioService));
-		m_acceptorV4.async_accept(*m_socket, [=](boost::system::error_code ec)
-		{
-			bool success = false;
-			if (!ec)
-			{
-				try
-				{
-					try {
-						clog(NetConnect) << "Accepted connection from " << m_socket->remote_endpoint();
-					} catch (...){}
-					bi::address remoteAddress = m_socket->remote_endpoint().address();
-					// Port defaults to 0 - we let the hello tell us which port the peer listens to
-					auto p = std::make_shared<Session>(this, std::move(*m_socket.release()), bi::tcp::endpoint(remoteAddress, 0));
-					p->start();
-					success = true;
-				}
-				catch (Exception const& _e)
-				{
-					clog(NetWarn) << "ERROR: " << diagnostic_information(_e);
-				}
-				catch (std::exception const& _e)
-				{
-					clog(NetWarn) << "ERROR: " << _e.what();
-				}
-			}
-			
-			if (!success && m_socket->is_open())
-			{
-				boost::system::error_code ec;
-				m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
-				m_socket->close();
-			}
 
-			m_accepting = false;
-			if (ec.value() < 1)
-				runAcceptor();
-		});
-	}
+	if (!m_run)
+		return;
+
+	clog(NetConnect) << "Listening on local port " << m_listenPort << " (public: " << m_public << ")";
+	m_socket.reset(new bi::tcp::socket(m_ioService));
+	_acceptor.async_accept(*m_socket, [=, &_acceptor](boost::system::error_code ec)
+	{
+		bool success = false;
+		if (!ec)
+		{
+			try
+			{
+				try {
+					clog(NetConnect) << "Accepted connection from " << m_socket->remote_endpoint();
+				} catch (...){}
+				bi::address remoteAddress = m_socket->remote_endpoint().address();
+				// Port defaults to 0 - we let the hello tell us which port the peer listens to
+				auto p = std::make_shared<Session>(this, std::move(*m_socket.release()), bi::tcp::endpoint(remoteAddress, 0));
+				p->start();
+				success = true;
+			}
+			catch (Exception const& _e)
+			{
+				clog(NetWarn) << "ERROR: " << diagnostic_information(_e);
+			}
+			catch (std::exception const& _e)
+			{
+				clog(NetWarn) << "ERROR: " << _e.what();
+			}
+		}
+		if (!success && m_socket->is_open())
+		{
+			boost::system::error_code ec;
+			m_socket->shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
+			m_socket->close();
+		}
+		if (ec.value() < 1)
+			doAcceptConnection(_acceptor);
+	});
 }
 
 string Host::pocHost()
@@ -655,8 +649,8 @@ void Host::startedWorking()
 		m_run = true;
 	}
 	
-	// try to open acceptor (todo: ipv6)
-	m_listenPort = Network::listen4(m_acceptorV4, m_netPrefs.listenPort);
+	// try to open acceptor for port and on all addresses (todo: ipv6)
+	m_listenPort = NetworkStatic::listen4(m_acceptorV4, m_netPrefs.listenPort);
 	
 	// start capability threads
 	for (auto const& h: m_capabilities)
@@ -669,7 +663,7 @@ void Host::startedWorking()
 		determinePublic(m_netPrefs.publicIP, m_netPrefs.upnp);
 		
 		if (m_listenPort > 0)
-			runAcceptor();
+			doAcceptConnection(m_acceptorV4);
 	}
 	
 	// if m_public address is valid then add us to node list

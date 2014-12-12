@@ -185,7 +185,7 @@ private:
 	void determinePublic(std::string const& _publicAddress, bool _upnp);
 	
 	/// Called only from startedWorking().
-	void runAcceptor();
+	void doAcceptConnection(bi::tcp::acceptor& _acceptor);
 	
 	void seal(bytes& _b);
 
@@ -207,19 +207,20 @@ private:
 	Nodes potentialPeers(RangeMask<unsigned> const& _known);
 
 	bool m_run = false;													///< Whether network is running.
-	std::mutex x_runTimer;													///< Start/stop mutex.
+	std::mutex x_runTimer;												///< Start/stop mutex.
 	
 	std::string m_clientVersion;											///< Our version string.
 
 	NetworkPreferences m_netPrefs;										///< Network settings.
 	
 	/// Interface addresses (private, public)
-	std::vector<bi::address> m_ifAddresses;									///< Interface addresses.
+	std::vector<bi::address> m_ifAddresses;								///< Interface addresses.
 
 	int m_listenPort = -1;												///< What port are we listening on. -1 means binding failed or acceptor hasn't been initialized.
 
-	ba::io_service m_ioService;							///< IOService for network stuff.
-	bi::tcp::acceptor m_acceptorV4;							///< Listening acceptor.
+	ba::io_service m_ioService;											///< IOService for network stuff.
+	bi::tcp::acceptor m_acceptorV4;										///< IPv4 Listening acceptor.
+	bi::tcp::acceptor m_acceptorV6;										///< IPv6 Listening acceptor.
 	std::unique_ptr<bi::tcp::socket> m_socket;								///< Listening socket.
 	
 	std::unique_ptr<boost::asio::deadline_timer> m_timer;					///< Timer which, when network is running, calls scheduler() every c_timerInterval ms.
@@ -258,8 +259,6 @@ private:
 	std::map<CapDesc, std::shared_ptr<HostCapabilityFace>> m_capabilities;	///< Each of the capabilities we support.
 
 	std::chrono::steady_clock::time_point m_lastPing;						///< Time we sent the last ping to all peers.
-
-	bool m_accepting = false;
 };
 
 }
