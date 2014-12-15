@@ -43,6 +43,16 @@ class RLPStream;
 
 namespace p2p
 {
+	
+struct NetworkPreferences
+{
+	NetworkPreferences(unsigned short p = 30303, std::string i = std::string(), bool u = true, bool l = false): listenPort(p), publicIP(i), upnp(u), localNetworking(l) {}
+
+	unsigned short listenPort = 30303;
+	std::string publicIP;
+	bool upnp = true;
+	bool localNetworking = false;
+};
 
 using NodeId = h512;
 

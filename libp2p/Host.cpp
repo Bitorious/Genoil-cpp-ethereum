@@ -41,7 +41,7 @@ Host::Host(std::string const& _clientVersion, NetworkPreferences const& _n, bool
 	Worker("p2p", 0),
 	m_clientVersion(_clientVersion),
 	m_netPrefs(_n),
-	m_ifAddresses(HostNetwork::getInterfaceAddresses()),
+	m_ifAddresses(HostUtil::getInterfaceAddresses()),
 	m_ioService(2), // once network is abstracted, default is faster
 	m_acceptorV4(m_ioService),
 	m_acceptorV6(m_ioService),
@@ -294,7 +294,7 @@ void Host::determinePublic(string const& _publicAddress, bool _upnp)
 	if (_upnp)
 	{
 		bi::address upnpifaddr;
-		bi::tcp::endpoint upnpep = NetworkStatic::traverseNAT(m_ifAddresses, m_listenPort, upnpifaddr);
+		bi::tcp::endpoint upnpep = HostUtil::traverseNAT(m_ifAddresses, m_listenPort, upnpifaddr);
 		if (!upnpep.address().is_unspecified() && !upnpifaddr.is_unspecified())
 		{
 			if (!m_peerAddresses.count(upnpep.address()))
@@ -650,7 +650,7 @@ void Host::startedWorking()
 	}
 	
 	// try to open acceptor for port and on all addresses (todo: ipv6)
-	m_listenPort = NetworkStatic::listen4(m_acceptorV4, m_netPrefs.listenPort);
+	m_listenPort = HostUtil::listen4(m_acceptorV4, m_netPrefs.listenPort);
 	
 	// start capability threads
 	for (auto const& h: m_capabilities)

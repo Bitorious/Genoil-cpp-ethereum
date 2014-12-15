@@ -23,6 +23,7 @@
 #pragma once
 
 #include <libdevcore/Worker.h>
+#include "NetworkUtil.h"
 #include "Common.h"
 namespace ba = boost::asio;
 namespace bi = ba::ip;
@@ -31,48 +32,6 @@ namespace dev
 {
 namespace p2p
 {
-	
-struct NetworkPreferences
-{
-	NetworkPreferences(unsigned short p = 30303, std::string i = std::string(), bool u = true, bool l = false): listenPort(p), publicIP(i), upnp(u), localNetworking(l) {}
-
-	unsigned short listenPort = 30303;
-	std::string publicIP;
-	bool upnp = true;
-	bool localNetworking = false;
-};
-
-struct NetworkStatic
-{
-	/// Try to bind and listen on _listenPort, else attempt net-allocated port.
-	static int listen4(bi::tcp::acceptor& _acceptor, unsigned short _listenPort);
-	
-	/// Return public endpoint of upnp interface. If successful o_upnpifaddr will be a private interface address and endpoint will contain public address and port.
-	static bi::tcp::endpoint traverseNAT(std::vector<bi::address> const& _ifAddresses, unsigned short _listenPort, bi::address& o_upnpifaddr);
-};
-
-/**
- * @brief Abstraction of static host network interfaces (TCP/IP).
- * @todo UDP, ICMP
- * @todo ifup/ifdown events
- */
-struct HostNetwork
-{
-	/// @returns public and private interface addresses
-	static std::vector<bi::address> getInterfaceAddresses();
-	
-	/// Return public endpoint of upnp interface. If successful o_upnpifaddr will be a private interface address and endpoint will contain public address and port.
-	static bi::tcp::endpoint traverseNAT(std::vector<bi::address> const& _ifAddresses, unsigned short _listenPort);
-	
-	HostNetwork(): ifAddresses(getInterfaceAddresses()) {}
-	
-	/// @returns *public* endpoint and updates potential publicAddresses. Attempts binding to _prefs.listenPort, else attempt via net-allocated port. Not thread-safe.
-	/// Endpoint precedence: User Provided > Public > UPnP [> Private] > Unspecified
-	bi::tcp::endpoint listen4(NetworkPreferences const& _prefs, bi::tcp::acceptor& _acceptor);
-	
-	std::vector<bi::address> ifAddresses;		///< Interface addresses (private, public).
-	std::set<bi::address> publicAddresses;		///< Public addresses that peers (can) know us by.
-};
 	
 class Connection: public std::enable_shared_from_this<Connection>
 {
@@ -133,7 +92,7 @@ private:
 	virtual void doneWorking() final;			///< Called by Worker thread after stop() called. Shuts down network.
 
 	NetworkPreferences m_netPrefs;			///< Network settings.
-	std::unique_ptr<HostNetwork> m_host;		///< Host addresses, upnp, etc.
+	std::unique_ptr<NetworkUtil> m_host;		///< Host addresses, upnp, etc.
 	ba::io_service m_io;						///< IOService for network stuff.
 	bi::tcp::acceptor m_acceptorV4;			///< IPv4 Listening acceptor.
 	

@@ -35,7 +35,7 @@
 #include <libdevcore/RangeMask.h>
 #include <libdevcrypto/Common.h>
 #include "HostCapability.h"
-#include "Network.h"
+#include "HostUtil.h"
 #include "Common.h"
 namespace ba = boost::asio;
 namespace bi = ba::ip;
