@@ -21,17 +21,26 @@
 
 #pragma once
 
+#include "PeerOverlay.h"
+
 namespace dev
 {
 namespace p2p
 {
-	
+
 /**
  * @brief P2P Protocol
  * Interface for implementing P2P protocols
  */
 class PeerProtocol
 {
+	static std::string name() { return ""; }
+	static h256 version() { return h256(); }
+	
+public:
+	static CapDesc capDesc() { assert(!name().empty()); assert(version()); return std::make_pair(name(), version()); };
+	
+	
 };
 
 }

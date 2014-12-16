@@ -55,6 +55,7 @@ struct NetworkPreferences
 };
 
 using NodeId = h512;
+using NodeAddress = h160;
 
 bool isPrivateAddress(bi::address const& _addressToCheck);
 bool isLocalHostAddress(bi::address const& _addressToCheck);
@@ -140,5 +141,14 @@ struct PeerInfo
 
 using PeerInfos = std::vector<PeerInfo>;
 
+enum class Origin
+{
+	Unknown,
+	Self,
+	SelfThird,
+	PerfectThird,
+	Perfect,
+};
+	
 }
 }

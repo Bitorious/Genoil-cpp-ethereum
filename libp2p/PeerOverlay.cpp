@@ -19,11 +19,22 @@
  * @date 2014
  */
 
+#include <libdevcore/Guards.h>
+#include <libdevcore/RLP.h>
 #include "PeerOverlay.h"
 
 using namespace std;
 using namespace dev;
 using namespace dev::p2p;
+
+PeerOverlay::PeerOverlay(string const& _clientVersion, NetworkPreferences const& _n, bool _start):
+	Worker("p2p", 0),
+	Network(_n, _start),
+	m_clientVersion(_clientVersion)
+{
+	for (auto i = 0; i < Address::size; i++)
+		m_state[i] = std::list<NodeId>();
+}
 
 void PeerOverlay::onStartup()
 {
@@ -45,7 +56,7 @@ void PeerOverlay::onRun()
 //	event: ping peers
 }
 
-void PeerOverlay::onConnection(std::shared_ptr<Connection>)
+void PeerOverlay::onConnect(std::shared_ptr<Connection>)
 {
 // Overlay:
 //	auto p = std::make_shared<Session>(this, std::move(*m_socket.release()), bi::tcp::endpoint(remoteAddress, 0));
@@ -78,4 +89,14 @@ void PeerOverlay::onShutdown()
 //		// poll until peers send out disconnect packets and are dropped
 //		m_io.poll();
 //	}
+}
+
+bytes PeerOverlay::saveNodes() const
+{
+	RLPStream ret(3);
+	return ret.out();
+}
+
+void PeerOverlay::restoreNodes(bytesConstRef)
+{
 }

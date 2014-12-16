@@ -23,6 +23,7 @@
 #include <boost/test/unit_test.hpp>
 #include <libp2p/Common.h>
 #include <libp2p/Network.h>
+#include <libp2p/PeerProtocol.h>
 #include <libdevcrypto/Common.h>
 #include <libdevcore/Worker.h>
 
@@ -32,12 +33,16 @@ using namespace dev::p2p;
 
 BOOST_AUTO_TEST_SUITE(devp2p)
 
-class Work: public Worker
+/**
+ * @brief Helper class for simulating asynchronous events
+ * Initially used for testing for thread-safety.
+ */
+class AsyncWork: public Worker
 {
 	typedef std::function<void()> fn;
 	
 public:
-	Work(fn _fn): Worker("", 0), m_function(_fn) {}
+	AsyncWork(fn _fn): Worker("", 0), m_function(_fn) {}
 	void start() { startWorking(); }
 	void stop() { stopWorking(); }
 	

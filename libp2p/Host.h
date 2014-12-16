@@ -50,15 +50,6 @@ namespace p2p
 
 class Host;
 
-enum class Origin
-{
-	Unknown,
-	Self,
-	SelfThird,
-	PerfectThird,
-	Perfect,
-};
-
 struct Node
 {
 	NodeId id;										///< Their id/public key.

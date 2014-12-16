@@ -58,19 +58,19 @@ protected:
  * @brief Network Class
  * Network operations and interface for establishing and maintaining network connections.
  */
-class Network: public Worker
+class Network: virtual public Worker
 {
 	static constexpr unsigned c_runInterval = 10;
 public:
 	Network(NetworkPreferences const& _n = NetworkPreferences(), bool _start = false);
-	virtual ~Network();
+	virtual ~Network() {};
 	
 	/// Start network (blocking).
 	void start() { startWorking(); };
 	
 	/// Stop network (blocking).
 	void stop();
-	
+
 protected:
 	/// Called by after network is setup but before any peer connection is established.
 	virtual void onStartup() { }
@@ -79,10 +79,12 @@ protected:
 	virtual void onRun() {}
 
 	/// Must be thread-safe. Called when new TCP connection is established.
-	virtual void onConnection(std::shared_ptr<Connection>) {}
+	virtual void onConnect(std::shared_ptr<Connection>) {}
 
 	/// Called by network during shutdown; returning false signals network to poll and try again. returning true signals that implementation has shutdown.
 	virtual void onShutdown() {}
+	
+	bi::tcp::endpoint ipAddress() { return m_ipAddress; }
 	
 private:
 	/// Runtime for network management events.
@@ -96,7 +98,7 @@ private:
 	ba::io_service m_io;						///< IOService for network stuff.
 	bi::tcp::acceptor m_acceptorV4;			///< IPv4 Listening acceptor.
 	
-	bi::tcp::endpoint m_peerAddress;
+	bi::tcp::endpoint m_ipAddress;
 	
 	Mutex x_run;											///< Prevents concurrent network start.
 	bool m_run = false;									///< Indicates network is running if true, or signals network to shutdown if false.
