@@ -84,7 +84,7 @@ protected:
 	/// Called by network during shutdown; returning false signals network to poll and try again. returning true signals that implementation has shutdown.
 	virtual void onShutdown() {}
 	
-	bi::tcp::endpoint ipAddress() { return m_ipAddress; }
+	bi::tcp::endpoint ipEndpoint() { return m_ipEndpoint; }
 	
 private:
 	/// Runtime for network management events.
@@ -98,7 +98,7 @@ private:
 	ba::io_service m_io;						///< IOService for network stuff.
 	bi::tcp::acceptor m_acceptorV4;			///< IPv4 Listening acceptor.
 	
-	bi::tcp::endpoint m_ipAddress;
+	bi::tcp::endpoint m_ipEndpoint;
 	
 	Mutex x_run;											///< Prevents concurrent network start.
 	bool m_run = false;									///< Indicates network is running if true, or signals network to shutdown if false.

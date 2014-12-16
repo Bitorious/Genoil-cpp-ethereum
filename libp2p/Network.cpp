@@ -106,16 +106,16 @@ void Network::startedWorking()
 	}
 	
 	// try to open acceptor (todo: ipv6)
-	m_ipAddress = m_host->listen4(m_netPrefs, m_acceptorV4);
+	m_ipEndpoint = m_host->listen4(m_netPrefs, m_acceptorV4);
 
 	onStartup();
 	
 	// listen to connections
 	// todo: GUI when listen is unavailable in UI
-	if (!m_ipAddress.address().is_unspecified())
+	if (!m_ipEndpoint.address().is_unspecified())
 		Connection::doAccept(m_acceptorV4, [this](std::shared_ptr<Connection> _conn) -> void {
-			// doAccept is scheduled via asio and lambda has shread_ptr to Connection
-			// so it's guaranteed that lambda won't outlive network.
+			// doAccept is scheduled via asio and lambda has shared_ptr to Connection
+			// so lambda won't outlive network.
 			onConnect(_conn);
 		});
 	

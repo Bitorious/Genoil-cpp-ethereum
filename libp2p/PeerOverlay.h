@@ -21,6 +21,7 @@
 
 #pragma once
 
+#include <libdevcore/RLP.h>
 #include <libdevcrypto/SHA3.h>
 #include <libdevcrypto/Common.h>
 #include "Network.h"
@@ -34,8 +35,7 @@ struct OverlayPeerInfo
 {
 	NodeId id;
 	std::string clientVersion;
-	std::string host;
-	unsigned short port;
+	bi::tcp::endpoint ipEndpoint;
 	std::chrono::steady_clock::duration lastPing;
 	std::set<CapDesc> caps;
 };
@@ -44,10 +44,11 @@ struct OverlayNode
 {
 	NodeId id;										///< Their id/public key.
 	Address address;									///< Address
-	bi::tcp::endpoint ipAddress;						///< As reported from the node itself.
+	bi::tcp::endpoint ipEndpoint;						///< As reported from the node itself.
 	Secret token;									///< Session token.
 	int score = 0;									///< All time cumulative.
 	int rating = 0;									///< Trending.
+	bool required;									///< If true, one or more protocols is requiring this node to be a peer.
 	bool dead = false;								///< If true, we believe this node is permanently dead - forget all about it.
 	std::chrono::system_clock::time_point lastConnected;
 	std::chrono::system_clock::time_point lastAttempted;
@@ -99,6 +100,8 @@ public:
 	/// Start peer network, listening for connections if start is true.
 	PeerOverlay(std::string const& _clientVersion, NetworkPreferences const& _n = NetworkPreferences(), bool _start = false);
 	
+	NodeId id() const { return m_alias.pub(); }
+	
 	/// Register a peer-capability; all new peer connections will have this capability.
 	template <class T> std::weak_ptr<T> registerCapability(T* _t) { auto ret = std::shared_ptr<T>(_t); m_capabilities[T::capDesc()] = ret; return ret; }
 	
@@ -111,14 +114,16 @@ public:
 	/// @returns true iff we have a peer of the given id.
 	template <class T> bool havePeer(NodeId _id) const { return (*m_peers)[T::capDesc()].count(_id); }
 	
-	NodeId id() const { return m_alias.pub(); }
+	template <class T> void send(NodeId, RLPStream);
+	template <class T> void makePeer(NodeId);
+	template <class T> void notRequired(NodeId);
 	
 protected:
 	virtual void onStartup();
 	virtual void onRun();
 	virtual void onConnect(std::shared_ptr<Connection>);
 	virtual void onShutdown();
-
+	
 	u160 dist(NodeId const& _n) const { return right160(sha3(id()))^right160(sha3(_n)); }
 	
 	unsigned int bindist(NodeId const& _n) const { auto d = dist(_n); unsigned ret; for (ret = 0; d >>= 1; ++ret) {}; return ret; }
@@ -128,19 +133,13 @@ protected:
 	
 	void noteNode(NodeId _n) { auto &t = m_state[bindist(_n)]; t.remove(_n); if (t.size() < kBuckets - 1) t.push_back(_n); else keepOrKill(_n, t.front()); }
 
-	/// Serialise the set of known peers.
-	bytes saveNodes() const;
-	
-	/// Deserialise the data and populate the set of known peers.
-	void restoreNodes(bytesConstRef _b);
-	
 private:
 	std::string m_clientVersion;		///< Our version string.
 	KeyPair m_alias;					///< Our default network alias.
 	
 	std::map<CapDesc, std::shared_ptr<PeerProtocol>> m_capabilities;	///< Each of the capabilities we support.
 	
-	std::map<unsigned,std::list<NodeId>> m_state;	///< State of this node (kademlia xor metric).
+	std::map<unsigned, std::list<NodeId>> m_state;	///< State of this node (kademlia xor metric).
 	
 	mutable Mutex x_nodes;
 	std::map<NodeId, std::pair<OverlayNode, std::weak_ptr<Connection>>> m_nodes;

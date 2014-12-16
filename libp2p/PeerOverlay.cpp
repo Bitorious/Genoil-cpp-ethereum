@@ -20,7 +20,6 @@
  */
 
 #include <libdevcore/Guards.h>
-#include <libdevcore/RLP.h>
 #include "PeerOverlay.h"
 
 using namespace std;
@@ -89,14 +88,4 @@ void PeerOverlay::onShutdown()
 //		// poll until peers send out disconnect packets and are dropped
 //		m_io.poll();
 //	}
-}
-
-bytes PeerOverlay::saveNodes() const
-{
-	RLPStream ret(3);
-	return ret.out();
-}
-
-void PeerOverlay::restoreNodes(bytesConstRef)
-{
 }
