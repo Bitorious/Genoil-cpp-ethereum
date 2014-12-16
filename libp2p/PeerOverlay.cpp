@@ -15,6 +15,7 @@
 	along with cpp-ethereum.  If not, see <http://www.gnu.org/licenses/>.
 */
 /** @file PeerOverlay.cpp
+ * @author Gav Wood <i@gavwood.com>
  * @author Alex Leverington <nessence@gmail.com>
  * @date 2014
  */

@@ -27,28 +27,13 @@ using namespace std;
 using namespace dev;
 using namespace dev::p2p;
 
-void Connection::doAccept(bi::tcp::acceptor& _acceptor, function<void(shared_ptr<Connection>)> _success)
-{
-	auto newConn = make_shared<Connection>(_acceptor.get_io_service());
-	_acceptor.async_accept(newConn->m_socket, [=, &_acceptor, &_success](boost::system::error_code _ec)
-	{
-		if (_ec)
-			newConn->drop();
-		else
-			_success(newConn);
-		
-		if (_ec.value() < 1)
-			doAccept(_acceptor, _success);
-	});
-}
-
 Network::Network(NetworkPreferences const& _n, bool _start):
 	Worker("net", 0),
 	m_netPrefs(_n),
 	m_io(),
-	m_acceptorV4(m_io)
+	m_tcp4Acceptor(m_io)
 {
-	// todo: Is this safe? remove?
+	// todo: Is this safe?
 	if (_start)
 		start();
 }
@@ -71,6 +56,21 @@ void Network::stop()
 	stopWorking();
 }
 
+void Network::doAccept(bi::tcp::acceptor& _acceptor)
+{
+	auto newConn = make_shared<Connection>(*this);
+	_acceptor.async_accept(newConn->m_socket, [=, &_acceptor](boost::system::error_code _ec)
+	{
+		if (_ec)
+			newConn->close();
+		else
+			onConnect(newConn); // see onConnect
+
+		if (_ec.value() < 1)
+			doAccept(_acceptor);
+	});
+}
+
 void Network::run(boost::system::error_code const&)
 {
 	if (!m_run)
@@ -88,7 +88,7 @@ void Network::run(boost::system::error_code const&)
 	/// todo: resize queue: egress <- protocols
 	
 	auto runcb = [this](boost::system::error_code const& error) -> void { run(error); };
-	m_timer->expires_from_now(boost::posix_time::milliseconds(c_runInterval));
+	m_timer->expires_from_now(boost::posix_time::milliseconds(c_maintenanceInterval));
 	m_timer->async_wait(runcb);
 }
 
@@ -105,19 +105,15 @@ void Network::startedWorking()
 		m_run = true;
 	}
 	
-	// try to open acceptor (todo: ipv6)
-	m_ipEndpoint = m_host->listen4(m_netPrefs, m_acceptorV4);
+	// try to open acceptor
+	m_tcp4Endpoint = m_host->listen4(m_netPrefs, m_tcp4Acceptor);
 
 	onStartup();
 	
 	// listen to connections
 	// todo: GUI when listen is unavailable in UI
-	if (!m_ipEndpoint.address().is_unspecified())
-		Connection::doAccept(m_acceptorV4, [this](std::shared_ptr<Connection> _conn) -> void {
-			// doAccept is scheduled via asio and lambda has shared_ptr to Connection
-			// so lambda won't outlive network.
-			onConnect(_conn);
-		});
+	if (!m_tcp4Endpoint.address().is_unspecified())
+		doAccept(m_tcp4Acceptor);
 	
 	run(boost::system::error_code());
 }
@@ -127,10 +123,10 @@ void Network::doneWorking()
 	// Note: m_io must be reset whenever poll() stops from running out of work.
 
 	m_io.reset();
-	if (m_acceptorV4.is_open())
+	if (m_tcp4Acceptor.is_open())
 	{
-		m_acceptorV4.cancel();
-		m_acceptorV4.close();
+		m_tcp4Acceptor.cancel();
+		m_tcp4Acceptor.close();
 	}
 	m_io.poll(); // poll for incoming connection which have been accepted but not started.
 	
@@ -142,7 +138,7 @@ void Network::doneWorking()
 	m_io.reset(); // for future start()
 }
 
-void Connection::drop()
+void Connection::close()
 {
 	if (m_socket.is_open())
 	{

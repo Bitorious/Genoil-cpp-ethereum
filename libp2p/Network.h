@@ -33,34 +33,19 @@ namespace dev
 namespace p2p
 {
 	
-class Connection: public std::enable_shared_from_this<Connection>
-{
-public:
-	static void doAccept(bi::tcp::acceptor& _acceptor, std::function<void(std::shared_ptr<Connection>)> _success);
-	
-	/// Constructor for incoming connections. Socket is provided.
-	Connection(boost::asio::io_service& _io_service): m_socket(_io_service) {}
-	
-	/// Constructor for outgoing connections.
-	Connection(boost::asio::io_service& _io_service, boost::asio::ip::tcp::endpoint): m_socket(_io_service) {}
+class Connection;
 
-	/// Destructor.
-	~Connection() { drop(); }
-
-	boost::asio::ip::tcp::endpoint remote() { return m_socket.remote_endpoint(); }
-	
-protected:
-	void drop();
-	boost::asio::ip::tcp::socket m_socket;
-};
-	
 /**
  * @brief Network Class
  * Network operations and interface for establishing and maintaining network connections.
+ * @todo udp4/6, tcp6
+ * @todo Abstract interface for endpoints (acceptors and addresses for ipv4, ipv6, tcp, and udp).
+ * @todo ringbuffer or linkedlist for network-event ipc
  */
 class Network: virtual public Worker
 {
-	static constexpr unsigned c_runInterval = 10;
+	static constexpr unsigned c_maintenanceInterval = 10;
+	friend class Connection;
 public:
 	Network(NetworkPreferences const& _n = NetworkPreferences(), bool _start = false);
 	virtual ~Network() {};
@@ -71,23 +56,30 @@ public:
 	/// Stop network (blocking).
 	void stop();
 
+	/// Accept incoming connections.
+	void doAccept(bi::tcp::acceptor& _acceptor);
+	
+	/// Connect to remote endpoint.
+	void connect(boost::asio::ip::tcp::endpoint _remote);
+	
 protected:
-	/// Called by after network is setup but before any peer connection is established.
+	/// Endpoint which we are accepting connections on.
+	bi::tcp::endpoint tcp4Endpoint() { return m_tcp4Endpoint; }
+	
+	/// Called after network is setup. (todo: before connections are created or accepted)
 	virtual void onStartup() { }
 
-	/// legacy. Called by runtime.
+	/// legacy. Called by runtime at c_maintenanceInterval + time spent running.
 	virtual void onRun() {}
 
-	/// Must be thread-safe. Called when new TCP connection is established.
+	/// Called by runtime when new TCP connection is established.
 	virtual void onConnect(std::shared_ptr<Connection>) {}
 
 	/// Called by network during shutdown; returning false signals network to poll and try again. returning true signals that implementation has shutdown.
 	virtual void onShutdown() {}
 	
-	bi::tcp::endpoint ipEndpoint() { return m_ipEndpoint; }
-	
 private:
-	/// Runtime for network management events.
+	/// Runtime for network events. (todo: runs *only* when event is pending, similar to connection write queueing)
 	void run(boost::system::error_code const&);
 	
 	virtual void startedWorking() final;		///< Called by Worker thread after start() called.
@@ -96,14 +88,41 @@ private:
 	NetworkPreferences m_netPrefs;			///< Network settings.
 	std::unique_ptr<NetworkUtil> m_host;		///< Host addresses, upnp, etc.
 	ba::io_service m_io;						///< IOService for network stuff.
-	bi::tcp::acceptor m_acceptorV4;			///< IPv4 Listening acceptor.
-	
-	bi::tcp::endpoint m_ipEndpoint;
+	bi::tcp::acceptor m_tcp4Acceptor;			///< IPv4 Listening acceptor.
+	bi::tcp::endpoint m_tcp4Endpoint;			///< IPv4 Address we advertise for ingress connections.
 	
 	Mutex x_run;											///< Prevents concurrent network start.
 	bool m_run = false;									///< Indicates network is running if true, or signals network to shutdown if false.
 	std::unique_ptr<boost::asio::deadline_timer> m_timer;	///< Timer for scheduling network management runtime.
 };
 
+class Connection: public std::enable_shared_from_this<Connection>
+{
+	friend class Network;
+public:
+	/// Constructor for incoming connections.
+	Connection(Network& _network): m_originated(false), m_socket(_network.m_io) {}
+	
+	/// Constructor for outgoing connections.
+	Connection(Network& _network, boost::asio::ip::tcp::endpoint): m_originated(true), m_socket(_network.m_io) {}
+
+	/// Destructor.
+	~Connection() { close(); }
+
+	boost::asio::ip::tcp::endpoint remote() { return m_socket.remote_endpoint(); }
+	
+protected:
+	void close();
+	
+private:
+	bool m_originated;
+	boost::asio::ip::tcp::socket m_socket;
+};
+	
+class RLPXConnection: public Connection
+{
+	// implements handshake when connected
+};
+	
 }
 }

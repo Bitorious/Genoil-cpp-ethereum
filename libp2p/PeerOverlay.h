@@ -15,6 +15,7 @@
 	along with cpp-ethereum.  If not, see <http://www.gnu.org/licenses/>.
 */
 /** @file PeerOverlay.h
+ * @author Gav Wood <i@gavwood.com>
  * @author Alex Leverington <nessence@gmail.com>
  * @date 2014
  */
@@ -113,7 +114,7 @@ public:
 	
 	/// @returns true iff we have a peer of the given id.
 	template <class T> bool havePeer(NodeId _id) const { return (*m_peers)[T::capDesc()].count(_id); }
-	
+
 	template <class T> void send(NodeId, RLPStream);
 	template <class T> void makePeer(NodeId);
 	template <class T> void notRequired(NodeId);
@@ -126,12 +127,12 @@ protected:
 	
 	u160 dist(NodeId const& _n) const { return right160(sha3(id()))^right160(sha3(_n)); }
 	
-	unsigned int bindist(NodeId const& _n) const { auto d = dist(_n); unsigned ret; for (ret = 0; d >>= 1; ++ret) {}; return ret; }
+	unsigned int binDist(NodeId const& _n) const { auto d = dist(_n); unsigned ret; for (ret = 0; d >>= 1; ++ret) {}; return ret; }
 	
 	/// If leastSeen doesn't respond then kick it from m_table, otherwise leastSeen will be removed.
 	void keepOrKill(NodeId _new, NodeId _leastSeen);
 	
-	void noteNode(NodeId _n) { auto &t = m_state[bindist(_n)]; t.remove(_n); if (t.size() < kBuckets - 1) t.push_back(_n); else keepOrKill(_n, t.front()); }
+	void noteNode(NodeId _n) { auto &t = m_state[binDist(_n)]; t.remove(_n); if (t.size() < kBuckets - 1) t.push_back(_n); else keepOrKill(_n, t.front()); }
 
 private:
 	std::string m_clientVersion;		///< Our version string.
