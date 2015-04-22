@@ -39,6 +39,9 @@
 #if ETH_ETHASHCL || !ETH_TRUE
 #include <libethash-cl/ethash_cl_miner.h>
 #endif
+#if ETH_ETHASHCU || !ETH_TRUE
+#include <libethash-cl/ethash_cu_miner.h>
+#endif
 #if ETH_CPUID || !ETH_TRUE
 #define HAVE_STDINT_H
 #include <libcpuid/libcpuid.h>
@@ -338,6 +341,145 @@ std::string Ethash::GPUMiner::platformInfo()
 unsigned Ethash::GPUMiner::getNumDevices()
 {
 	return ethash_cl_miner::get_num_devices(s_platformId);
+}
+
+#endif
+
+#if ETH_ETHASHCL || !ETH_TRUE
+
+class EthashCUHook : public ethash_cu_miner::search_hook
+{
+public:
+	EthashCUHook(Ethash::CUDAMiner* _owner) : m_owner(_owner) {}
+
+	void abort()
+	{
+		Guard l(x_all);
+		if (m_aborted)
+			return;
+		//		cdebug << "Attempting to abort";
+		m_abort = true;
+		for (unsigned timeout = 0; timeout < 100 && !m_aborted; ++timeout)
+			std::this_thread::sleep_for(chrono::milliseconds(30));
+		//		if (!m_aborted)
+		//			cwarn << "Couldn't abort. Abandoning OpenCL process.";
+	}
+
+	void reset()
+	{
+		m_aborted = m_abort = false;
+	}
+
+protected:
+	virtual bool found(uint64_t const* _nonces, uint32_t _count) override
+	{
+		//		dev::operator <<(std::cerr << "Found nonces: ", vector<uint64_t>(_nonces, _nonces + _count)) << std::endl;
+		for (uint32_t i = 0; i < _count; ++i)
+		{
+			if (m_owner->report(_nonces[i]))
+			{
+				m_aborted = true;
+				return true;
+			}
+		}
+		return m_owner->shouldStop();
+	}
+
+	virtual bool searched(uint64_t _startNonce, uint32_t _count) override
+	{
+		Guard l(x_all);
+		//		std::cerr << "Searched " << _count << " from " << _startNonce << std::endl;
+		m_owner->accumulateHashes(_count);
+		m_last = _startNonce + _count;
+		if (m_abort || m_owner->shouldStop())
+		{
+			m_aborted = true;
+			return true;
+		}
+		return false;
+	}
+
+private:
+	Mutex x_all;
+	uint64_t m_last;
+	bool m_abort = false;
+	bool m_aborted = true;
+	Ethash::GPUMiner* m_owner = nullptr;
+};
+
+unsigned Ethash::CUDAMiner::s_deviceId = 0;
+unsigned Ethash::CUDAMiner::s_numInstances = 1;
+
+Ethash::CUDAMiner::CUDAMiner(ConstructionInfo const& _ci) :
+Miner(_ci),
+Worker("cudaminer" + toString(index())),
+m_hook(new EthashCUHook(this))
+{
+}
+
+Ethash::CUDAMiner::~CUDAMiner()
+{
+	pause();
+	delete m_miner;
+	delete m_hook;
+}
+
+bool Ethash::CUDAMiner::report(uint64_t _nonce)
+{
+	Nonce n = (Nonce)(u64)_nonce;
+	Result r = EthashAux::eval(work().seedHash, work().headerHash, n);
+	if (r.value < work().boundary)
+		return submitProof(Solution{ n, r.mixHash });
+	return false;
+}
+
+void Ethash::CUDAMiner::kickOff()
+{
+	m_hook->reset();
+	startWorking();
+}
+
+void Ethash::CUDAMiner::workLoop()
+{
+	// take local copy of work since it may end up being overwritten by kickOff/pause.
+	try {
+		WorkPackage w = work();
+		if (!m_miner || m_minerSeed != w.seedHash)
+		{
+			m_minerSeed = w.seedHash;
+
+			delete m_miner;
+			m_miner = new ethash_cl_miner;
+
+			auto p = EthashAux::params(m_minerSeed);
+			auto cb = [&](void* d) { EthashAux::full(m_minerSeed, bytesRef((byte*)d, p.full_size)); };
+			unsigned device = instances() > 1 ? index() : s_deviceId;
+			m_miner->init(p, cb, 32, s_platformId, device);
+		}
+
+		uint64_t upper64OfBoundary = (uint64_t)(u64)((u256)w.boundary >> 192);
+		m_miner->search(w.headerHash.data(), upper64OfBoundary, *m_hook);
+	}
+	catch (...)
+	{
+		cwarn << "Error CUDA mining. GPU memory fragmentation?";
+	}
+}
+
+void Ethash::CUDAMiner::pause()
+{
+	m_hook->abort();
+	stopWorking();
+}
+
+std::string Ethash::CUDAMiner::platformInfo()
+{
+	return ethash_cu_miner::platform_info(s_platformId, s_deviceId);
+}
+
+unsigned Ethash::CUDAMiner::getNumDevices()
+{
+	return ethash_cu_miner::get_num_devices(s_platformId);
 }
 
 #endif
