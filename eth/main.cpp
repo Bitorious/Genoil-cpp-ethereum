@@ -134,8 +134,9 @@ void help()
 		<< "    -f,--force-mining  Mine even when there are no transactions to mine (default: off)" << endl
 		<< "    -C,--cpu  When mining, use the CPU." << endl
 		<< "    -G,--opencl  When mining use the GPU via OpenCL." << endl
+		<< "    -U,--cuda    When mining use the GPU via CUDA." << endl
 		<< "    --opencl-platform <n>  When mining using -G/--opencl use OpenCL platform n (default: 0)." << endl
-		<< "    --opencl-device <n>  When mining using -G/--opencl use OpenCL device n (default: 0)." << endl
+		<< "    --gpu-device <n>  When mining using -G/--opencl  or -U/--cuda use OpenCL/CUDA device n (default: 0)." << endl
 		<< "    -t, --mining-threads <n> Limit number of CPU/GPU miners to n (default: use everything available on selected platform)" << endl
 		<< "Client networking:" << endl
 		<< "    --client-name <name>  Add a name to your client's version string (default: blank)." << endl
@@ -155,7 +156,7 @@ void help()
 		<< "Ethash verify mode:" << endl
 		<< "    -w,--check-pow <headerHash> <seedHash> <difficulty> <nonce>  Check PoW credentials for validity." << endl
 		<< "Benchmarking mode:" << endl
-		<< "    -M,--benchmark  Benchmark for mining and exit; use with --cpu and --opencl." << endl
+		<< "    -M,--benchmark  Benchmark for mining and exit; use with --cpu and --opencl/--cuda." << endl
 		<< "    --benchmark-warmup <seconds>  Set the duration of warmup for the benchmark tests (default: 3)." << endl
 		<< "    --benchmark-trial <seconds>  Set the duration for each trial for the benchmark tests (default: 3)." << endl
 		<< "    --benchmark-trials <n>  Set the duration of warmup for the benchmark tests (default: 5)." << endl
@@ -266,7 +267,8 @@ enum class Format
 enum class MinerType
 {
 	CPU,
-	GPU
+	GPU,
+	CUDA
 };
 
 void doBenchmark(MinerType _m, bool _phoneHome, unsigned _warmupDuration = 15, unsigned _trialDuration = 3, unsigned _trials = 5)
@@ -278,7 +280,7 @@ void doBenchmark(MinerType _m, bool _phoneHome, unsigned _warmupDuration = 15, u
 	GenericFarm<Ethash> f;
 	f.onSolutionFound([&](ProofOfWork::Solution) { return false; });
 
-	string platformInfo = _m == MinerType::CPU ? ProofOfWork::CPUMiner::platformInfo() : _m == MinerType::GPU ? ProofOfWork::GPUMiner::platformInfo() : "";
+	string platformInfo = _m == MinerType::CPU ? ProofOfWork::CPUMiner::platformInfo() : _m == MinerType::GPU ? ProofOfWork::GPUMiner::platformInfo() : _m == MinerType::CUDA ? ProofOfWork::CUDAMiner::platformInfo() : "";
 	cout << "Benchmarking on platform: " << platformInfo << endl;
 
 	cout << "Preparing DAG..." << endl;
@@ -291,6 +293,8 @@ void doBenchmark(MinerType _m, bool _phoneHome, unsigned _warmupDuration = 15, u
 		f.startCPU();
 	else if (_m == MinerType::GPU)
 		f.startGPU();
+	else if (_m == MinerType::CUDA)
+		f.startCUDA();
 
 	map<uint64_t, MiningProgress> results;
 	uint64_t mean = 0;
@@ -406,6 +410,7 @@ void doFarm(MinerType _m, string const& _remote, unsigned _recheckPeriod)
 
 int main(int argc, char** argv)
 {
+	/*
 	cout << "\x1b[30mEthBlack\x1b[0m" << endl;
 	cout << "\x1b[90mEthCoal\x1b[0m" << endl;
 	cout << "\x1b[37mEthGray\x1b[0m" << endl;
@@ -471,7 +476,7 @@ int main(int argc, char** argv)
 	cout << "\x1b[4;35mEthPurpleU\x1b[0m" << endl;
 	cout << "\x1b[4;36mEthCyanU\x1b[0m" << endl;
 	cout << "\x1b[4;37mEthWhiteU\x1b[0m" << endl;
-
+	*/
 	// Init defaults
 	Defaults::get();
 
@@ -482,7 +487,7 @@ int main(int argc, char** argv)
 	/// Mining options
 	MinerType minerType = MinerType::CPU;
 	unsigned openclPlatform = 0;
-	unsigned openclDevice = 0;
+	unsigned gpuDevice = 0;
 	unsigned miningThreads = UINT_MAX;
 
 	/// File name for import/export.
@@ -609,9 +614,9 @@ int main(int argc, char** argv)
 				cerr << "Bad " << arg << " option: " << argv[i] << endl;
 				return -1;
 			}
-		else if (arg == "--opencl-device" && i + 1 < argc)
+		else if (arg == "--gpu-device" && i + 1 < argc)
 			try {
-				openclDevice = stol(argv[++i]);
+				gpuDevice = stol(argv[++i]);
 				miningThreads = 1;
 			}
 			catch (...)
@@ -723,6 +728,8 @@ int main(int argc, char** argv)
 			minerType = MinerType::CPU;
 		else if (arg == "-G" || arg == "--opencl")
 			minerType = MinerType::GPU;
+		else if (arg == "-U" || arg == "--cuda")
+			minerType = MinerType::CUDA;
 		else if ((arg == "-s" || arg == "--secret") && i + 1 < argc)
 			sigKey = KeyPair(h256(fromHex(argv[++i])));
 		else if ((arg == "-S" || arg == "--session-secret") && i + 1 < argc)
@@ -926,8 +933,13 @@ int main(int argc, char** argv)
 	else if (minerType == MinerType::GPU)
 	{
 		ProofOfWork::GPUMiner::setDefaultPlatform(openclPlatform);
-		ProofOfWork::GPUMiner::setDefaultDevice(openclDevice);
+		ProofOfWork::GPUMiner::setDefaultDevice(gpuDevice);
 		ProofOfWork::GPUMiner::setNumInstances(miningThreads);
+	}
+	else if (minerType == MinerType::CUDA)
+	{
+		ProofOfWork::CUDAMiner::setDefaultDevice(gpuDevice);
+		ProofOfWork::CUDAMiner::setNumInstances(miningThreads);
 	}
 
 	// Two codepaths is necessary since named block require database, but numbered

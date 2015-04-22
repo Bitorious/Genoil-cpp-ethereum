@@ -143,7 +143,18 @@ EthashAux::FullType EthashAux::full(BlockInfo const& _header, bytesRef _dest, bo
 	return full(_header.seedHash(), _dest, _createIfMissing);
 }
 
-EthashAux::FullType EthashAux::full(h256 const& _seedHash, bytesRef _dest, bool _createIfMissing)
+#if ETH_ETHASHCL
+EthashAux::FullType EthashAux::full_cuda(h256 const& _seedHash, const char ** data, size_t& size)
+{
+	RecursiveGuard l(get()->x_this);
+	FullType ret = get()->m_fulls[_seedHash].lock();
+	*data = (const char*)ret->data.begin();
+	size = ret->data.count();
+	return FullType();
+}
+#endif
+
+EthashAux::FullType EthashAux::full(h256 const& _seedHash, bytesRef _dest, bool _createIfMissing) 
 {
 	RecursiveGuard l(get()->x_this);
 	FullType ret = get()->m_fulls[_seedHash].lock();
