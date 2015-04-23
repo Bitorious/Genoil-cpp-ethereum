@@ -38,4 +38,5 @@ void run_ethash_search(
 	ulong target,
 	uint isolate
 );
+
 #endif;

@@ -281,7 +281,11 @@ message("-- GUI              Build GUI components                     ${GUI}")
 message("-- NCURSES          Build NCurses components                 ${NCURSES}")
 message("-- TESTS            Build tests                              ${TESTS}")
 message("-- ETHASHCL         Build OpenCL components (experimental!)  ${ETHASHCL}")
+<<<<<<< HEAD
 message("-- ETHASHCU         Build CUDA components (experimental!)    ${ETHASHCU}")
+=======
+message("-- ETHASHCU         Build CUDA components (experimental!)	  ${ETHASHCU}")
+>>>>>>> a019e9bba72d63f353fa7cd12dbd00441ce94c67
 message("-- EVMJIT           Build LLVM-based JIT EVM (experimental!) ${EVMJIT}")
 message("------------------------------------------------------------------------")
 message("")

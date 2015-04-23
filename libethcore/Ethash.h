@@ -181,7 +181,11 @@ public:
 		h256 m_minerSeed;		///< Last seed in m_miner
 		static unsigned s_deviceId;
 		static unsigned s_numInstances;
+<<<<<<< HEAD
 	};
+=======
+};
+>>>>>>> a019e9bba72d63f353fa7cd12dbd00441ce94c67
 #else
 	using CUDAMiner = CPUMiner;
 #endif

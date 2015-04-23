@@ -1,5 +1,6 @@
 set(EXECUTABLE ethash-cu)
 
+<<<<<<< HEAD
 aux_source_directory(. SRC_LIST)
 file(GLOB HEADERS "*.h")
 
@@ -9,6 +10,16 @@ SET (CUDA_VERBOSE_BUILD ON CACHE BOOL "nvcc verbose" FORCE)
 
 CUDA_ADD_LIBRARY(${EXECUTABLE} STATIC ethash_cu_miner_kernel_globals.h ethash_cu_miner_kernel.h ethash_cu_miner_kernel.cu)
 
+=======
+include(bin2h.cmake)
+bin2h(SOURCE_FILE ethash_cu_miner_kernel.cu
+	VARIABLE_NAME ethash_cu_miner_kernel
+	HEADER_FILE ${CMAKE_CURRENT_BINARY_DIR}/ethash_cu_miner_kernel.h)
+
+aux_source_directory(. SRC_LIST)
+file(GLOB HEADERS "*.h")
+
+>>>>>>> a019e9bba72d63f353fa7cd12dbd00441ce94c67
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CUDA_INCLUDE_DIRS})
 include_directories(..)

@@ -22,3 +22,4 @@ void run_ethash_search(
 {
 	ethash_search<<<g_search_batch_size,g_workgroup_size>>>(g_output, g_header, g_dag, start_nonce,	target, isolate);
 }
+

@@ -31,6 +31,7 @@
 #include <libethash/util.h>
 #include <libethash/ethash.h>
 #include "ethash_cu_miner.h"
+
 #include "etash_cu_miner_kernel_globals.h"
 
 #define ETHASH_BYTES 32
@@ -90,10 +91,12 @@ std::string ethash_cu_miner::platform_info(unsigned _deviceId)
 	int version_minor = (runtime_version - (version_major * 1000)) / 10;
 	sprintf(platform, "%d.%d", version_major, version_minor);
 
+
 	char compute[5];
 	sprintf(compute, "%d.%d", device_props.major, device_props.minor);
 
 	return "{ \"platform\": \"CUDA " + std::string(platform) + "\", \"device\": \"" + device_props.name + "\", \"version\": \"Compute " + std::string(compute) + "\" }";
+
 }
 
 int ethash_cu_miner::get_num_devices()
@@ -157,9 +160,11 @@ bool ethash_cu_miner::init(ethash_params const& params, std::function<void(const
 	g_workgroup_size = m_workgroup_size;
 	g_search_batch_size  = c_search_batch_size;
 
+
 	//debugf("%s", code.c_str());
 
 	// create buffer for dag
+<<<<<<< HEAD
 	if (cudaMalloc(&m_dag_ptr, params.full_size) == cudaErrorMemoryAllocation) 
 	{
 		cout << cudaGetErrorString(cudaErrorMemoryAllocation) << endl;
@@ -228,6 +233,7 @@ void ethash_cu_miner::hash(uint8_t* ret, uint8_t const* header, uint64_t nonce, 
 		uint isolate
 		)
 	*/
+
 	/*
 	m_hash_kernel.setArg(1, m_header);
 	m_hash_kernel.setArg(2, m_dag);
@@ -279,7 +285,6 @@ void ethash_cu_miner::hash(uint8_t* ret, uint8_t const* header, uint64_t nonce, 
 
 void ethash_cu_miner::search(uint8_t const* header, uint64_t target, search_hook& hook)
 {
-	
 	struct pending_batch
 	{
 		uint64_t start_nonce;
@@ -291,7 +296,6 @@ void ethash_cu_miner::search(uint8_t const* header, uint64_t target, search_hook
 
 	// update header constant buffer
 
-	
 	cudaMemcpy(m_header, header, 32, cudaMemcpyHostToDevice);
 	for (unsigned i = 0; i != c_num_buffers; ++i)
 	{
@@ -309,6 +313,7 @@ void ethash_cu_miner::search(uint8_t const* header, uint64_t target, search_hook
 	)
 	*/
 	/*
+
 	m_search_kernel.setArg(1, m_header);
 	m_search_kernel.setArg(2, m_dag);
 
@@ -321,6 +326,7 @@ void ethash_cu_miner::search(uint8_t const* header, uint64_t target, search_hook
 	for (uint64_t start_nonce = 0; ; start_nonce += c_search_batch_size)
 	{
 		// supply output buffer to kernel
+
 		//m_search_kernel.setArg(0, m_search_buf[buf]);
 		//m_search_kernel.setArg(3, start_nonce);
 
@@ -339,6 +345,7 @@ void ethash_cu_miner::search(uint8_t const* header, uint64_t target, search_hook
 			// could use pinned host pointer instead
 			uint32_t* results;
 			cudaMemcpy(m_search_buf[batch.buf], results, (1 + c_max_search_results) * sizeof(uint32_t), cudaMemcpyDeviceToHost);
+
 
 			unsigned num_found = std::min<unsigned>(results[0], c_max_search_results);
 
