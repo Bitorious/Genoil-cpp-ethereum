@@ -40,11 +40,7 @@
 #include <libethash-cl/ethash_cl_miner.h>
 #endif
 #if ETH_ETHASHCU || !ETH_TRUE
-<<<<<<< HEAD
 #include <libethash-cu/ethash_cu_miner.h>
-=======
-#include <libethash-cl/ethash_cu_miner.h>
->>>>>>> a019e9bba72d63f353fa7cd12dbd00441ce94c67
 #endif
 #if ETH_CPUID || !ETH_TRUE
 #define HAVE_STDINT_H
@@ -349,11 +345,7 @@ unsigned Ethash::GPUMiner::getNumDevices()
 
 #endif
 
-<<<<<<< HEAD
 #if ETH_ETHASHCU || !ETH_TRUE
-=======
-#if ETH_ETHASHCL || !ETH_TRUE
->>>>>>> a019e9bba72d63f353fa7cd12dbd00441ce94c67
 
 class EthashCUHook : public ethash_cu_miner::search_hook
 {
@@ -412,11 +404,7 @@ private:
 	uint64_t m_last;
 	bool m_abort = false;
 	bool m_aborted = true;
-<<<<<<< HEAD
 	Ethash::CUDAMiner* m_owner = nullptr;
-=======
-	Ethash::GPUMiner* m_owner = nullptr;
->>>>>>> a019e9bba72d63f353fa7cd12dbd00441ce94c67
 };
 
 unsigned Ethash::CUDAMiner::s_deviceId = 0;
@@ -461,7 +449,7 @@ void Ethash::CUDAMiner::workLoop()
 			m_minerSeed = w.seedHash;
 
 			delete m_miner;
-<<<<<<< HEAD
+
 			m_miner = new ethash_cu_miner;
 
 			auto p = EthashAux::params(m_minerSeed);
@@ -469,14 +457,6 @@ void Ethash::CUDAMiner::workLoop()
 			auto cb = [&](const char ** d, size_t& s) { EthashAux::full_cuda(m_minerSeed,d,s); };
 			unsigned device = instances() > 1 ? index() : s_deviceId;
 			m_miner->init(p, cb, 32, device);
-=======
-			m_miner = new ethash_cl_miner;
-
-			auto p = EthashAux::params(m_minerSeed);
-			auto cb = [&](void* d) { EthashAux::full(m_minerSeed, bytesRef((byte*)d, p.full_size)); };
-			unsigned device = instances() > 1 ? index() : s_deviceId;
-			m_miner->init(p, cb, 32, s_platformId, device);
->>>>>>> a019e9bba72d63f353fa7cd12dbd00441ce94c67
 		}
 
 		uint64_t upper64OfBoundary = (uint64_t)(u64)((u256)w.boundary >> 192);
@@ -496,20 +476,12 @@ void Ethash::CUDAMiner::pause()
 
 std::string Ethash::CUDAMiner::platformInfo()
 {
-<<<<<<< HEAD
 	return ethash_cu_miner::platform_info(s_deviceId);
-=======
-	return ethash_cu_miner::platform_info(s_platformId, s_deviceId);
->>>>>>> a019e9bba72d63f353fa7cd12dbd00441ce94c67
 }
 
 unsigned Ethash::CUDAMiner::getNumDevices()
 {
-<<<<<<< HEAD
 	return ethash_cu_miner::get_num_devices();
-=======
-	return ethash_cu_miner::get_num_devices(s_platformId);
->>>>>>> a019e9bba72d63f353fa7cd12dbd00441ce94c67
 }
 
 #endif
