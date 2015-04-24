@@ -53,4 +53,4 @@ private:
 	uint * m_search_buf[c_num_buffers];
 
 	unsigned m_workgroup_size;
-}
+};

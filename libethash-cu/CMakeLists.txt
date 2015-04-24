@@ -5,10 +5,6 @@ file(GLOB HEADERS "*.h")
 
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-O3 -gencode=arch=compute_20,code=sm_20 -gencode=arch=compute_30,code=sm_30 -gencode=arch=compute_35,code=sm_35 -gencode=arch=compute_50,code=sm_50 -gencode=arch=compute_52,code=sm_52 -gencode=arch=compute_52,code=compute_52)
 
-SET (CUDA_VERBOSE_BUILD ON CACHE BOOL "nvcc verbose" FORCE)
-
-CUDA_ADD_LIBRARY(${EXECUTABLE} STATIC ethash_cu_miner_kernel_globals.h ethash_cu_miner_kernel.h ethash_cu_miner_kernel.cu)
-
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 include_directories(${CUDA_INCLUDE_DIRS})
 include_directories(..)

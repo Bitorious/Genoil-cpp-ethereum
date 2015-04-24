@@ -39,4 +39,4 @@ void run_ethash_search(
 	uint isolate
 );
 
-#endif;
+#endif

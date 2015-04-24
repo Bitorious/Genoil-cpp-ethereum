@@ -30,9 +30,10 @@
 #include <vector>
 #include <libethash/util.h>
 #include <libethash/ethash.h>
+#include "etash_cu_miner_kernel_globals.h"
 #include "ethash_cu_miner.h"
 
-#include "etash_cu_miner_kernel_globals.h"
+
 
 #define ETHASH_BYTES 32
 
@@ -164,7 +165,6 @@ bool ethash_cu_miner::init(ethash_params const& params, std::function<void(const
 	//debugf("%s", code.c_str());
 
 	// create buffer for dag
-<<<<<<< HEAD
 	if (cudaMalloc(&m_dag_ptr, params.full_size) == cudaErrorMemoryAllocation) 
 	{
 		cout << cudaGetErrorString(cudaErrorMemoryAllocation) << endl;
