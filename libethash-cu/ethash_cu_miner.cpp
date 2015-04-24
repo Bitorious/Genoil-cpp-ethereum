@@ -30,7 +30,6 @@
 #include <vector>
 #include <libethash/util.h>
 #include <libethash/ethash.h>
-#include "etash_cu_miner_kernel_globals.h"
 #include "ethash_cu_miner.h"
 
 
@@ -154,13 +153,18 @@ bool ethash_cu_miner::init(ethash_params const& params, std::function<void(const
 
 	// patch source code
 
-	g_dag_size = (unsigned)(params.full_size / ETHASH_MIX_BYTES);
-	g_acceses = ETHASH_ACCESSES;
-	g_max_outputs = c_max_search_results;
+	unsigned dag_size = (unsigned)(params.full_size / ETHASH_MIX_BYTES);
+	cudaMemcpyToSymbol(&d_dag_size, &dag_size, sizeof(unsigned));
+	unsigned acceses = ETHASH_ACCESSES;
+	cudaMemcpyToSymbol(&d_acceses, &acceses, sizeof(unsigned));
+
+	unsigned max_outputs = c_max_search_results;
+	cudaMemcpyToSymbol(&d_max_outputs, &max_outputs, sizeof(unsigned));
+
+	cudaMemcpyToSymbol(&d_workgroup_size, &m_workgroup_size, sizeof(unsigned));
 
 	g_workgroup_size = m_workgroup_size;
 	g_search_batch_size  = c_search_batch_size;
-
 
 	//debugf("%s", code.c_str());
 
@@ -343,8 +347,8 @@ void ethash_cu_miner::search(uint8_t const* header, uint64_t target, search_hook
 			pending_batch const& batch = pending.front();
 
 			// could use pinned host pointer instead
-			uint32_t* results;
-			cudaMemcpy(m_search_buf[batch.buf], results, (1 + c_max_search_results) * sizeof(uint32_t), cudaMemcpyDeviceToHost);
+			uint32_t results[1 + c_max_search_results];
+			cudaMemcpy(results, m_search_buf[batch.buf], (1 + c_max_search_results) * sizeof(uint32_t), cudaMemcpyDeviceToHost);
 
 
 			unsigned num_found = std::min<unsigned>(results[0], c_max_search_results);

@@ -1,7 +1,7 @@
 #ifndef _ETHASH_CU_MINER_KERNEL_H_
 #define _ETHASH_CU_MINER_KERNEL_H_
 
-typedef unsigned long ulong;
+typedef unsigned long long int ulong;
 typedef unsigned int  uint;
 
 typedef union
@@ -22,18 +22,26 @@ typedef union
 	uint4 uint4s[128 / sizeof(uint4)];
 } hash128_t;
 
+uint g_search_batch_size;
+uint g_workgroup_size;
+
+__device__ __constant__ uint d_workgroup_size;
+__device__ __constant__ uint d_dag_size;
+__device__ __constant__ uint d_acceses;
+__device__ __constant__ uint d_max_outputs;
+
 void run_ethash_hash(
-	__global__ hash32_t* g_hashes,
-	__constant__ hash32_t const* g_header,
-	__global__ hash128_t const* g_dag,
+	hash32_t* g_hashes,
+	hash32_t const* g_header,
+	hash128_t const* g_dag,
 	ulong start_nonce,
 	uint isolate
 );
 
 void run_ethash_search(
-	__global__ volatile uint* restrict g_output,
-	__constant__ hash32_t const* g_header,
-	__global__ hash128_t const* g_dag,
+	uint* g_output,
+	hash32_t const* g_header,
+	hash128_t const* g_dag,
 	ulong start_nonce,
 	ulong target,
 	uint isolate
